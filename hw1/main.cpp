@@ -8,9 +8,13 @@ int main(int argc, char* argv[])
     // single thread processor
     // it's either processing something or it's not
     bool processorAvailable = true;
+    bool tempAvailable = true;
     // vector of processes, fill by reading from a file
     vector<Process> processList;
-
+    unsigned long processes;
+    vector<unsigned long>  eventIndex;
+    vector<long> eventDuration;
+    
     // Do not touch
     long time = 1;
     long sleepDuration = 50;
@@ -40,41 +44,28 @@ int main(int argc, char* argv[])
 
     // Read in from the file
     initProcessSetFromFile(file, processList);
-    unsigned long processes = processList.size();
-    unsigned long* current_index = new unsigned long [processes];
-    unsigned long** event_index = new unsigned long* [processes];
+    processes = processList.size();
+    eventIndex.reserve(processes);
+    eventDuration.reserve(processes);
+
     for ( unsigned long i = 0; i < processes; i++ )
     {
-        event_index[i] = new unsigned long [processList.at(i).ioEvents.size()];
-        current_index[i] = 0;
-        event_index[i][current_index[i]] = 0;
-    }         
+        eventIndex.push_back(0);
+        eventDuration.push_back(0);
+    }
+
     while( allProcessesComplete(processList) == false )
     {
-        // Set state of all processes that should be ready to ready
-        // hint: arrival time and processes becoming unblocked
-
         for ( unsigned long i = 0; i < processes; i++ )
         {
-            if ( processorAvailable == true )
-            {
-                for ( unsigned long j = 0; j < processes; j++ )
-                {
-                    if ( processList.at(j).state == ready && processorAvailable == true)
-                    {
-                        processorAvailable = false;
-                        processList.at(j).state = processing;
-                    }
-                } 
-            }    
-
             if ( processList.at(i).state == notArrived )
             {
                 if ( processList.at(i).arrivalTime == time )
                 {
                     processList.at(i).state = ready;
+
                     if ( processList.at(i).ioEvents.size() != 0 )
-                        processList.at(i).currentEvent = processList.at(i).ioEvents.front();
+                        processList.at(i).currentEvent = processList.at(i).ioEvents.at(0);
 
                     if ( processList.at(i).reqProcessorTime == 0 )
                     {
@@ -85,25 +76,23 @@ int main(int argc, char* argv[])
                 }
             }
 
-            if ( processList.at(i).state == blocked )
+            if ( processorAvailable == true )
             {
-                if ( static_cast<long>(event_index[i][current_index[i]]) == processList.at(i).currentEvent.duration )
+                for ( unsigned long j = 0; j < processes; j++ )
                 {
-                    processList.at(i).state = ready;
-
-                    if ( current_index[i] < processList.at(i).ioEvents.size() )
+                    if ( ( processList.at(j).state == ready ) && ( tempAvailable == true ))
                     {
-                        current_index[i]++;
-                        processList.at(i).currentEvent = processList.at(i).ioEvents.at(current_index[i]);
+                        tempAvailable = false;
+                        processorAvailable = tempAvailable;
+                        processList.at(j).state = processing;
                     }
                 }
-
-                else
-                    event_index[i][current_index[i]]++;        
-            }
+            }    
 
             if ( processList.at(i).state == processing )
             {
+                processList.at(i).processorTime++;
+                    
                 if ( processList.at(i).processorTime == processList.at(i).reqProcessorTime )
                 {
                     processList.at(i).state = done;
@@ -111,26 +100,31 @@ int main(int argc, char* argv[])
                     processorAvailable = true;
                 }
 
-                else if ( processList.at(i).ioEvents.size() != 0 && processList.at(i).currentEvent.time == processList.at(i).processorTime )
+                else if (( processList.at(i).ioEvents.size() != 0 ) && ( processList.at(i).currentEvent.time == processList.at(i).processorTime ))
                 {
                     processList.at(i).state = blocked;
                     processorAvailable = true;
-                }
+                }    
+            }
 
-                else 
-                    processList.at(i).processorTime++;
-            }     
+            if ( processList.at(i).state == blocked )
+            {
+                eventDuration.at(i)++; 
+
+                if ( eventDuration.at(i) == processList.at(i).currentEvent.duration )
+                {
+                    processList.at(i).state = ready;
+                    eventDuration.at(i) = 0;
+                    eventIndex.at(i)++;
+
+                    if ( eventIndex.at(i) < processList.at(i).ioEvents.size() )
+                    {
+                        processList.at(i).currentEvent = processList.at(i).ioEvents.at(eventIndex.at(i));
+                    }
+                }      
+            }    
         }
-        printProcessSet(processList);
-        // Select the next process that should be given to the processor
-
-        // Increment the selected process's processorTime
-        // Set state of the process based on the following: 
-        // required process time met - done; IOEvent started - blocked; 
-
-        // Make sure to track the time that processes have been blocked
-        // you can do update this just about anywhere as long as it gets
-        // updated each time iteration
+        tempAvailable = processorAvailable;
 
         // Do not touch
         cout << time++ << '\t'; // Do not touch
@@ -138,16 +132,6 @@ int main(int argc, char* argv[])
         printProcessStates(processList); // change processList to another vector of processes if desired
         this_thread::sleep_for(chrono::milliseconds(sleepDuration)); // Do not touch
     }
-
-    // freeing the memory used in the program 
-    for ( unsigned long i = 0; i < processes; i++ )
-    {
-        delete[] event_index[i];
-    }
-    delete[] event_index;
-	event_index = NULL;
-    delete[] current_index;
-    current_index = NULL;
 
     return 0;
 }
