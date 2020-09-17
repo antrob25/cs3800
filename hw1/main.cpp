@@ -8,11 +8,15 @@ int main(int argc, char* argv[])
     // single thread processor
     // it's either processing something or it's not
     bool processorAvailable = true;
+    // acts as a processorAvailable in the for loop
     bool tempAvailable = true;
     // vector of processes, fill by reading from a file
     vector<Process> processList;
+    // number of processes in the processList
     unsigned long processes;
+    // tracks the event number in the processes 
     vector<unsigned long>  eventIndex;
+    // tracks the time an event has been active
     vector<long> eventDuration;
     
     // Do not touch
@@ -45,28 +49,35 @@ int main(int argc, char* argv[])
     // Read in from the file
     initProcessSetFromFile(file, processList);
     processes = processList.size();
+    // reserve data for the vectors
     eventIndex.reserve(processes);
     eventDuration.reserve(processes);
 
+    // fill the vectors 
     for ( unsigned long i = 0; i < processes; i++ )
     {
         eventIndex.push_back(0);
         eventDuration.push_back(0);
     }
 
+    // main loop for processing functionality
     while( allProcessesComplete(processList) == false )
     {
+        // processes all the processes in processList
         for ( unsigned long i = 0; i < processes; i++ )
         {
+            // checks for processes that have not arrived
             if ( processList.at(i).state == notArrived )
             {
                 if ( processList.at(i).arrivalTime == time )
                 {
                     processList.at(i).state = ready;
 
+                    // setting the first currentEvent
                     if ( processList.at(i).ioEvents.size() != 0 )
                         processList.at(i).currentEvent = processList.at(i).ioEvents.at(0);
 
+                    // Handling of 0 processing time process
                     if ( processList.at(i).reqProcessorTime == 0 )
                     {
                         processList.at(i).state = done;
@@ -78,6 +89,7 @@ int main(int argc, char* argv[])
 
             if ( processorAvailable == true )
             {
+                // processes the next available process
                 for ( unsigned long j = 0; j < processes; j++ )
                 {
                     if ( ( processList.at(j).state == ready ) && ( tempAvailable == true ))
@@ -89,6 +101,7 @@ int main(int argc, char* argv[])
                 }
             }    
 
+            // Sets processes that are finished to done and block the process if there is an ioevent
             if ( processList.at(i).state == processing )
             {
                 processList.at(i).processorTime++;
@@ -107,6 +120,7 @@ int main(int argc, char* argv[])
                 }    
             }
 
+            // Unblocks processes if their ioevent is finished and continues if it is not finished 
             if ( processList.at(i).state == blocked )
             {
                 eventDuration.at(i)++; 
@@ -124,6 +138,7 @@ int main(int argc, char* argv[])
                 }      
             }    
         }
+
         tempAvailable = processorAvailable;
 
         // Do not touch
