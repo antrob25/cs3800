@@ -17,11 +17,13 @@
 using namespace std;
 
 const string fileBase = "outFile";
+const int MAX_SIZE = 32767;
 
-binary_semaphore ExampleB, canWrite;//, canWrite[5];   // Note: auto-assigned to 1 in constructor
-general_semaphore ExampleG, fileAvailable;  // Note: auto assigned to 0 in constructor
-enum State { THINKING, WAITING, WRITING };
-vector<State> philStates;
+binary_semaphore ExampleB; // Note: auto-assigned to 1 in constructor
+binary_semaphore fileWrite[MAX_SIZE]; //semaphore array for each fork
+general_semaphore ExampleG;  // Note: auto assigned to 0 in constructor
+enum State { THINKING, WAITING, WRITING }; // declaring enum to hold states for the philosophers
+vector<State> philStates; // holds the states for the number of philosophers
 
 // checks the Philosopher's neighbors before writing on a page
 void checkPhil( const int& id, const int& left, const int& right, const float& sleepTime )
@@ -29,8 +31,7 @@ void checkPhil( const int& id, const int& left, const int& right, const float& s
     if ( (philStates[id] == WAITING) && (philStates[left] != WRITING) && (philStates[right]) != WRITING )
     {
         philStates[id] = WRITING;
-        cout << "Philospher " << id << " is writing on pages " << id << " and " << right << ".\n";
-        fileAvailable.signal();
+        cout << "Philosopher " << id << " is writing on pages " << id << " and " << right << ".\n";
         sleep(sleepTime);
     }
 }
@@ -38,36 +39,32 @@ void checkPhil( const int& id, const int& left, const int& right, const float& s
 // Sets the Philosopher to waiting before it receives a page
 void takePage( const int& id, const int& left, const int& right, const int& leftP, const float& sleepTime )
 {
-    canWrite.lock();
-    philStates[id] = WAITING;
-    cout << "Philospher " << id << " is WAITING on pages " << left << " and " << right << ".\n";
+    fileWrite[id].lock();
+    fileWrite[right].lock();
+    cout << "Philosopher " << id << " is WAITING on pages " << left << " and " << right << ".\n";
     checkPhil( id, leftP, right, sleepTime);
-    canWrite.unlock();
-    if ( philStates[id] != WRITING )
-    {
-        fileAvailable.wait();
-        sleep(sleepTime);
-    }    
+    sleep(sleepTime);
 }
 
 // sets the Philosopher to thinking after it is done with a page
 void returnPage( const int& id, const int& left, const int& right, const int& numPhils, const int& leftP, const float& sleepTime )
 {
+    fileWrite[id].unlock();
+    fileWrite[right].unlock();
     philStates[id] = THINKING;
-    cout << "Philospher " << id << " is finished using pages " << left << " and " << right << ".\n";
+    cout << "Philosopher " << id << " is finished using pages " << left << " and " << right << ".\n";
     checkPhil( leftP, ((leftP + (numPhils-1)) % numPhils), id, sleepTime );
     checkPhil( right, id, ((right + 1) % numPhils) , sleepTime );
-    canWrite.unlock();
 }
 
 void Phil(int id, int totalPhils, int maxMessages, float sleepTime, int seed)
 { 
     int numWritten = 0;
-  
+
     //setup message storage locations
     int leftNeighbor = id;
     int rightNeighbor = (id + 1) % totalPhils;
-    int leftPage = ((id + (totalPhils-1)) % totalPhils);
+    int leftPage = ((id + (totalPhils-1)) % totalPhils); // determines the left neighbor of the philosopher
   
     poemerize P(seed + id);
   
@@ -76,62 +73,51 @@ void Phil(int id, int totalPhils, int maxMessages, float sleepTime, int seed)
     ofstream foutLeft(lFile.c_str(), ios::out | ios::app );
     ofstream foutRight(rFile.c_str(), ios::out | ios::app );
   
-    //I know! Let's force the entire thing to be executed sequentially (bye bye parallelism!)
-    //ExampleB.wait();
     while (numWritten < maxMessages) 
     {
-  	    //LET'S JUST IGNORE MUTUAL EXCLUSION AND ASSUME IT'S SAFE TO WRITE TO THE FILE!
-        //cout << "Phil: " << id << " SEQUENTIALLY writing to " << lFile << " and " << rFile << endl;
         //If you want to see correct poems, change MAXMESSAGES to something VERY small and add this sleep
         //if you set sleepTime = id this will delay each process so the initial interleaving(s) will 
         //likely look OK without mutual exclusion **If you do this CHANGE IT BACK
   	    sleep(sleepTime);
-  
-        //canWrite[id].wait();
-        //canWrite[rightNeighbor].wait();
         takePage( id, leftNeighbor, rightNeighbor, leftPage, sleepTime );
         sleep(sleepTime);
-        canWrite.lock();
+
         //construct poem & output stanzas into the files 'simultaneously'
         //we do this with an intermediate variable so both files contain the same poem!
         string stanza1, stanza2, stanza3;
         stanza1 = P.getLine();
 
-        cout << "Philospher " << id << " is writing the first stanza." << endl;
+        cout << "Philosopher " << id << " is writing the first stanza." << endl;
         
         foutLeft << stanza1 << endl;
-        cout << "Philospher " << id << " wrote the first stanza on page " << leftNeighbor << "." << endl;
+        cout << "Philosopher " << id << " wrote the first stanza on page " << leftNeighbor << "." << endl;
 
         foutRight << stanza1 << endl;
-        cout << "Philospher " << id << " wrote the first stanza on page" << rightNeighbor << "." << endl;
+        cout << "Philosopher " << id << " wrote the first stanza on page " << rightNeighbor << "." << endl;
 
         stanza2 = P.getLine();
 
-        cout << "Philospher " << id << " is writing the second stanza." << endl;
+        cout << "Philosopher " << id << " is writing the second stanza." << endl;
 
         foutLeft << stanza2 << endl;
-        cout << "Philospher " << id << " wrote the second stanza on page" << leftNeighbor << "." << endl;
+        cout << "Philosopher " << id << " wrote the second stanza on page " << leftNeighbor << "." << endl;
+
         foutRight << stanza2 << endl;
-        cout << "Philospher " << id << " wrote the second stanza on page" << rightNeighbor << "." << endl;
+        cout << "Philosopher " << id << " wrote the second stanza on page " << rightNeighbor << "." << endl;
     
         stanza3 = P.getLine();
 
-        cout << "Philospher " << id << " is writing the third stanza." << endl;
+        cout << "Philosopher " << id << " is writing the third stanza." << endl;
 
         foutLeft << stanza3 << endl << endl;
-        cout << "Philospher " << id << " wrote the third stanza on page" << leftNeighbor << "." << endl;
+        cout << "Philosopher " << id << " wrote the third stanza on page " << leftNeighbor << "." << endl;
+
         foutRight << stanza3 << endl << endl;
-        cout << "Philospher " << id << " wrote the third stanza on page" << rightNeighbor << "." << endl;
+        cout << "Philosopher " << id << " wrote the third stanza on page " << rightNeighbor << "." << endl;
     
-        //canWrite[id].signal();
-        //canWrite[rightNeighbor].signal();
-        sleep(sleepTime);
         returnPage( id, leftNeighbor, rightNeighbor, totalPhils, leftPage, sleepTime );
-        canWrite.unlock();
-        sleep(sleepTime);
         numWritten++;
     }
-    //ExampleB.signal();
   
     foutLeft.close();
     foutRight.close();
