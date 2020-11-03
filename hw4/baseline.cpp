@@ -53,7 +53,6 @@ void takePage( const int& id, const int& left, const int& right, const int& left
 // sets the Philosopher to thinking after it is done with a page
 void returnPage( const int& id, const int& left, const int& right, const int& numPhils, const int& leftP, const float& sleepTime )
 {
-    canWrite.lock();
     philStates[id] = THINKING;
     cout << "Philospher " << id << " is finished using pages " << left << " and " << right << ".\n";
     checkPhil( leftP, ((leftP + (numPhils-1)) % numPhils), id, sleepTime );
@@ -92,6 +91,7 @@ void Phil(int id, int totalPhils, int maxMessages, float sleepTime, int seed)
         //canWrite[rightNeighbor].wait();
         takePage( id, leftNeighbor, rightNeighbor, leftPage, sleepTime );
         sleep(sleepTime);
+        canWrite.lock();
         //construct poem & output stanzas into the files 'simultaneously'
         //we do this with an intermediate variable so both files contain the same poem!
         string stanza1, stanza2, stanza3;
@@ -103,30 +103,31 @@ void Phil(int id, int totalPhils, int maxMessages, float sleepTime, int seed)
         cout << "Philospher " << id << " wrote the first stanza on page " << leftNeighbor << "." << endl;
 
         foutRight << stanza1 << endl;
-        cout << "Philospher " << id << " wrote the first stanza" << rightNeighbor << "." << endl;
+        cout << "Philospher " << id << " wrote the first stanza on page" << rightNeighbor << "." << endl;
 
         stanza2 = P.getLine();
 
         cout << "Philospher " << id << " is writing the second stanza." << endl;
 
         foutLeft << stanza2 << endl;
-        cout << "Philospher " << id << " wrote the second stanza" << leftNeighbor << "." << endl;
+        cout << "Philospher " << id << " wrote the second stanza on page" << leftNeighbor << "." << endl;
         foutRight << stanza2 << endl;
-        cout << "Philospher " << id << " wrote the second stanza" << rightNeighbor << "." << endl;
+        cout << "Philospher " << id << " wrote the second stanza on page" << rightNeighbor << "." << endl;
     
         stanza3 = P.getLine();
 
         cout << "Philospher " << id << " is writing the third stanza." << endl;
 
         foutLeft << stanza3 << endl << endl;
-        cout << "Philospher " << id << " wrote the third stanza" << leftNeighbor << "." << endl;
+        cout << "Philospher " << id << " wrote the third stanza on page" << leftNeighbor << "." << endl;
         foutRight << stanza3 << endl << endl;
-        cout << "Philospher " << id << " wrote the third stanza" << rightNeighbor << "." << endl;
+        cout << "Philospher " << id << " wrote the third stanza on page" << rightNeighbor << "." << endl;
     
         //canWrite[id].signal();
         //canWrite[rightNeighbor].signal();
         sleep(sleepTime);
         returnPage( id, leftNeighbor, rightNeighbor, totalPhils, leftPage, sleepTime );
+        canWrite.unlock();
         sleep(sleepTime);
         numWritten++;
     }
