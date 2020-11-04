@@ -17,23 +17,20 @@
 using namespace std;
 
 const string fileBase = "outFile";
-const int MAX_SIZE = 32767;
 
 binary_semaphore ExampleB; // Note: auto-assigned to 1 in constructor
-binary_semaphore fileWrite[MAX_SIZE]; //semaphore array for each fork
+binary_semaphore fileWrite; //semaphore array for each fork
 general_semaphore ExampleG;  // Note: auto assigned to 0 in constructor
 enum State { THINKING, WAITING, WRITING }; // declaring enum to hold states for the philosophers
 vector<State> philStates; // holds the states for the number of philosophers
-queue<int> waitingList;
 
 // checks the Philosopher's neighbors before writing on a page
 void checkPhil( const int& id, const int& left, const int& right, const float& sleepTime )
 {
     if ( (philStates[id] == WAITING) && (philStates[left] != WRITING) && (philStates[right]) != WRITING )
     {
-        fileWrite[id].unlock();
-        waitingList.pop();
-        cout << "Phil is no longer waiting" << endl;
+        fileWrite.unlock();
+        cout << "Phil " << id << " is no longer waiting" << endl;
         philStates[id] = WRITING;
         cout << "Philosopher " << id << " is writing on pages " << id << " and " << right << ".\n";
         sleep(sleepTime);    
@@ -45,11 +42,10 @@ void takePage( const int& id, const int& left, const int& right, const int& left
 {
     philStates[id] = WAITING; 
     cout << "Philosopher " << id << " is WAITING on pages " << left << " and " << right << ".\n";
-    waitingList.push(id);
     checkPhil( id, leftP, right, sleepTime);
     if ( philStates[id] != WRITING )
     {
-        fileWrite[id].lock();
+        fileWrite.lock();
         cout << "Locked Page  " << id << endl;
         sleep(sleepTime);
     }
@@ -82,9 +78,6 @@ void Phil(int id, int totalPhils, int maxMessages, float sleepTime, int seed)
   
     while (numWritten < maxMessages) 
     {
-        //If you want to see correct poems, change MAXMESSAGES to something VERY small and add this sleep
-        //if you set sleepTime = id this will delay each process so the initial interleaving(s) will 
-        //likely look OK without mutual exclusion **If you do this CHANGE IT BACK
   	    sleep(sleepTime);
         takePage( id, leftNeighbor, rightNeighbor, leftPage, sleepTime );
         sleep(sleepTime);
