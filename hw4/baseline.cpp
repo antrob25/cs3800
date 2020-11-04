@@ -24,37 +24,44 @@ binary_semaphore fileWrite[MAX_SIZE]; //semaphore array for each fork
 general_semaphore ExampleG;  // Note: auto assigned to 0 in constructor
 enum State { THINKING, WAITING, WRITING }; // declaring enum to hold states for the philosophers
 vector<State> philStates; // holds the states for the number of philosophers
+queue<int> waitingList;
 
 // checks the Philosopher's neighbors before writing on a page
 void checkPhil( const int& id, const int& left, const int& right, const float& sleepTime )
 {
     if ( (philStates[id] == WAITING) && (philStates[left] != WRITING) && (philStates[right]) != WRITING )
     {
+        fileWrite[id].unlock();
+        waitingList.pop();
+        cout << "Phil is no longer waiting" << endl;
         philStates[id] = WRITING;
         cout << "Philosopher " << id << " is writing on pages " << id << " and " << right << ".\n";
-        sleep(sleepTime);
+        sleep(sleepTime);    
     }
 }
 
 // Sets the Philosopher to waiting before it receives a page
 void takePage( const int& id, const int& left, const int& right, const int& leftP, const float& sleepTime )
 {
-    fileWrite[id].lock();
-    fileWrite[right].lock();
+    philStates[id] = WAITING; 
     cout << "Philosopher " << id << " is WAITING on pages " << left << " and " << right << ".\n";
+    waitingList.push(id);
     checkPhil( id, leftP, right, sleepTime);
-    sleep(sleepTime);
+    if ( philStates[id] != WRITING )
+    {
+        fileWrite[id].lock();
+        cout << "Locked Page  " << id << endl;
+        sleep(sleepTime);
+    }
 }
 
 // sets the Philosopher to thinking after it is done with a page
 void returnPage( const int& id, const int& left, const int& right, const int& numPhils, const int& leftP, const float& sleepTime )
 {
-    fileWrite[id].unlock();
-    fileWrite[right].unlock();
     philStates[id] = THINKING;
     cout << "Philosopher " << id << " is finished using pages " << left << " and " << right << ".\n";
     checkPhil( leftP, ((leftP + (numPhils-1)) % numPhils), id, sleepTime );
-    checkPhil( right, id, ((right + 1) % numPhils) , sleepTime );
+    checkPhil( right, id, ((right + 1) % numPhils), sleepTime );
 }
 
 void Phil(int id, int totalPhils, int maxMessages, float sleepTime, int seed)
@@ -79,44 +86,47 @@ void Phil(int id, int totalPhils, int maxMessages, float sleepTime, int seed)
         //if you set sleepTime = id this will delay each process so the initial interleaving(s) will 
         //likely look OK without mutual exclusion **If you do this CHANGE IT BACK
   	    sleep(sleepTime);
-        takePage( id, leftNeighbor, rightNeighbor, leftPage, sleepTime );
+        takePage( id, leftNeighbor, rightNeighbor, leftPage, /*totalPhils,*/ sleepTime );
         sleep(sleepTime);
 
         //construct poem & output stanzas into the files 'simultaneously'
         //we do this with an intermediate variable so both files contain the same poem!
-        string stanza1, stanza2, stanza3;
-        stanza1 = P.getLine();
+        if ( philStates[id] == WRITING )
+        {
+            string stanza1, stanza2, stanza3;
+            stanza1 = P.getLine();
 
-        cout << "Philosopher " << id << " is writing the first stanza." << endl;
+            cout << "Philosopher " << id << " is writing the first stanza." << endl;
         
-        foutLeft << stanza1 << endl;
-        cout << "Philosopher " << id << " wrote the first stanza on page " << leftNeighbor << "." << endl;
+            foutLeft << stanza1 << endl;
+            cout << "Philosopher " << id << " wrote the first stanza on page " << leftNeighbor << "." << endl;
 
-        foutRight << stanza1 << endl;
-        cout << "Philosopher " << id << " wrote the first stanza on page " << rightNeighbor << "." << endl;
+            foutRight << stanza1 << endl;
+            cout << "Philosopher " << id << " wrote the first stanza on page " << rightNeighbor << "." << endl;
 
-        stanza2 = P.getLine();
+            stanza2 = P.getLine();
 
-        cout << "Philosopher " << id << " is writing the second stanza." << endl;
+            cout << "Philosopher " << id << " is writing the second stanza." << endl;
 
-        foutLeft << stanza2 << endl;
-        cout << "Philosopher " << id << " wrote the second stanza on page " << leftNeighbor << "." << endl;
+            foutLeft << stanza2 << endl;
+            cout << "Philosopher " << id << " wrote the second stanza on page " << leftNeighbor << "." << endl;
 
-        foutRight << stanza2 << endl;
-        cout << "Philosopher " << id << " wrote the second stanza on page " << rightNeighbor << "." << endl;
+            foutRight << stanza2 << endl;
+            cout << "Philosopher " << id << " wrote the second stanza on page " << rightNeighbor << "." << endl;
     
-        stanza3 = P.getLine();
+            stanza3 = P.getLine();
 
-        cout << "Philosopher " << id << " is writing the third stanza." << endl;
+            cout << "Philosopher " << id << " is writing the third stanza." << endl;
 
-        foutLeft << stanza3 << endl << endl;
-        cout << "Philosopher " << id << " wrote the third stanza on page " << leftNeighbor << "." << endl;
+            foutLeft << stanza3 << endl << endl;
+            cout << "Philosopher " << id << " wrote the third stanza on page " << leftNeighbor << "." << endl;
 
-        foutRight << stanza3 << endl << endl;
-        cout << "Philosopher " << id << " wrote the third stanza on page " << rightNeighbor << "." << endl;
-    
-        returnPage( id, leftNeighbor, rightNeighbor, totalPhils, leftPage, sleepTime );
-        numWritten++;
+            foutRight << stanza3 << endl << endl;
+            cout << "Philosopher " << id << " wrote the third stanza on page " << rightNeighbor << "." << endl;
+
+            returnPage( id, leftNeighbor, rightNeighbor, totalPhils, leftPage, sleepTime );
+            numWritten++;
+        }
     }
   
     foutLeft.close();
@@ -131,7 +141,6 @@ int main ( int argc, char *argv[] )
     float sleepTime = 1;   //amount of time to sleep threads
     int randomSeed = 2;    //default seed for RNG
 
-    philStates.reserve(5);
     for ( int i = 0; i < 5; i++ )
     {
         philStates.push_back(THINKING);
