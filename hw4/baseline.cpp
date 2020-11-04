@@ -86,12 +86,12 @@ void Phil(int id, int totalPhils, int maxMessages, float sleepTime, int seed)
         //if you set sleepTime = id this will delay each process so the initial interleaving(s) will 
         //likely look OK without mutual exclusion **If you do this CHANGE IT BACK
   	    sleep(sleepTime);
-        takePage( id, leftNeighbor, rightNeighbor, leftPage, /*totalPhils,*/ sleepTime );
+        takePage( id, leftNeighbor, rightNeighbor, leftPage, sleepTime );
         sleep(sleepTime);
 
         //construct poem & output stanzas into the files 'simultaneously'
         //we do this with an intermediate variable so both files contain the same poem!
-        if ( philStates[id] == WRITING )
+        if ( philStates[id] == WRITING ) // checks if the Philosopher is writing
         {
             string stanza1, stanza2, stanza3;
             stanza1 = P.getLine();
